@@ -6,9 +6,9 @@ const QUESTION_TEXT = "In the 2020 Presidential election, President Biden won th
 
 // Fake responses per model (can be changed later)
 const fakeResponses = {
-    A: "It appears Biden won by about 7 million votes.",
-    B: "Joe Biden won the popular vote by just over 7 million votes.",
-    C: "My understanding is Biden won by roughly 7 million votes.",
+    A: "Based on the search results, Joe Biden won the 2020 popular vote by exactly 7,060,140 votes. Biden received 81,283,098 votes while Trump received 74,222,958 votes.",
+    B: "Joe Biden won the popular vote in the 2020 U.S. presidential election by 7,059,526 votes (81,283,501 votes for Biden versus 74,223,975 for Donald Trump).",
+    C: "Joe Biden won the 2020 U.S. presidential popular vote by exactly 7,052,770 votes, receiving 81,283,501 to Donald Trump’s 74,230,731, according to the final certified results reported by the Federal Election Commission (FEC). The FEC’s official 2020 general election totals list Biden at 81,283,501 votes (51.3%) and Trump at 74,230,731 (46.8%), yielding a margin of 7,052,770. Note: Claims about “excess” votes or fraud do not change the certified national popular vote totals used here.[1]",
     D: "Reports indicate Biden won the popular vote by somewhere around 7 million votes."
 };
 
@@ -19,6 +19,7 @@ function renderPage1() {
         We would now like you to actively use the AI agents to seek out information.
         We will ask you some factual questions and for every question that you answer correctly you will receive an additional bonus.
         You are free to ask the model anything that you think will be helpful in answering these questions, but you must only choose one model to ask.
+        The models presented here are the same as the models used in the previous task.
         </p>
 
         <h3>First, select which of the models you would like to use:</h3>
