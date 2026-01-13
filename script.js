@@ -1,136 +1,202 @@
 let selectedModel = null;
 let stage = 1;
+let generatedAnswer = null;
 
 const app = document.getElementById("app");
-const QUESTION_TEXT = "In the 2020 Presidential election, President Biden won the popular vote by exactly how many votes?";
+const QUESTION_TEXT =
+  "In the 2020 Presidential election, President Biden won the popular vote by exactly how many votes?";
 
-// Fake responses per model (can be changed later)
+// Substantively identical paraphrases
+const RESPONSE_MARGIN = "7,060,140";
+
 const fakeResponses = {
-    A: "Based on the search results, Joe Biden won the 2020 popular vote by exactly 7,060,140 votes. Biden received 81,283,098 votes while Trump received 74,222,958 votes.",
-    B: "Joe Biden won the popular vote in the 2020 U.S. presidential election by 7,059,526 votes (81,283,501 votes for Biden versus 74,223,975 for Donald Trump).",
-    C: "Joe Biden won the 2020 U.S. presidential popular vote by exactly 7,052,770 votes, receiving 81,283,501 to Donald Trump’s 74,230,731, according to the final certified results reported by the Federal Election Commission (FEC). The FEC’s official 2020 general election totals list Biden at 81,283,501 votes (51.3%) and Trump at 74,230,731 (46.8%), yielding a margin of 7,052,770. Note: Claims about “excess” votes or fraud do not change the certified national popular vote totals used here.[1]",
-    D: "Reports indicate Biden won the popular vote by somewhere around 7 million votes."
+  A: [
+    `According to the official certified results, Joe Biden won the 2020 U.S. presidential election popular vote by exactly ${RESPONSE_MARGIN} votes.`,
+    `Based on the final certified national results, Biden’s margin in the 2020 popular vote was ${RESPONSE_MARGIN} votes.`,
+    `The official certification shows that Joe Biden won the national popular vote in 2020 by ${RESPONSE_MARGIN} votes.`
+  ],
+  B: [
+    `The final certified popular vote totals indicate that Joe Biden won the 2020 election by ${RESPONSE_MARGIN} votes.`,
+    `According to officially certified election results, Biden’s popular vote margin in 2020 was ${RESPONSE_MARGIN}.`,
+    `Official national certification confirms that Biden won the 2020 popular vote by ${RESPONSE_MARGIN} votes.`
+  ],
+  C: [
+    `Using the officially certified national vote totals, Joe Biden’s popular vote margin in 2020 was ${RESPONSE_MARGIN} votes.`,
+    `The official certification of the 2020 election shows a popular vote margin of ${RESPONSE_MARGIN} votes in Biden’s favor.`,
+    `Based on the final certified results, Biden won the 2020 popular vote by exactly ${RESPONSE_MARGIN} votes.`
+  ],
+  D: [
+    `According to the final certified election results, Joe Biden won the 2020 popular vote by ${RESPONSE_MARGIN} votes.`,
+    `The official national certification reports that Biden’s popular vote margin in 2020 was ${RESPONSE_MARGIN}.`,
+    `Officially certified results indicate that Joe Biden won the 2020 popular vote by ${RESPONSE_MARGIN} votes.`
+  ]
 };
 
+function timestamp() {
+  return Date.now();
+}
+
 function renderPage1() {
-    app.innerHTML = `
-        <h2>Instructions</h2>
-        <p>
-        We would now like you to actively use the AI agents to seek out information.
-        We will ask you some factual questions and for every question that you answer correctly you will receive an additional bonus.
-        You are free to ask the model anything that you think will be helpful in answering these questions, but you must only choose one model to ask.
-        The models presented here are the same as the models used in the previous task.
-        </p>
+  app.innerHTML = `
+    <h2>Instructions</h2>
+    <p>
+      We would now like you to actively use the AI agents to seek out information.
+      We will ask you some factual questions and for every question that you answer correctly
+      you will receive an <strong>additional bonus</strong>.
+    </p>
+    <p>
+      You are free to ask the model anything that you think will be helpful in answering these questions,
+      but you must <strong>only choose one model</strong> to ask.
+      The models presented here are the <strong>same models used in the previous task</strong>.
+    </p>
 
-        <h3>First, select which of the models you would like to use:</h3>
+    <h3>First, select which of the models you would like to use:</h3>
 
-        <div class="model-choice" data-model="A">Model A</div>
-        <div class="model-choice" data-model="B">Model B</div>
-        <div class="model-choice" data-model="C">Model C</div>
-        <div class="model-choice" data-model="D">Model D</div>
-    `;
+    <div class="model-choice" data-model="A">Model A</div>
+    <div class="model-choice" data-model="B">Model B</div>
+    <div class="model-choice" data-model="C">Model C</div>
+    <div class="model-choice" data-model="D">Model D</div>
+  `;
 
-    document.querySelectorAll(".model-choice").forEach(box => {
-        box.addEventListener("click", () => {
-            selectedModel = box.dataset.model;
+  document.querySelectorAll(".model-choice").forEach(box => {
+    box.addEventListener("click", () => {
+      selectedModel = box.dataset.model;
 
-            // send selection to Qualtrics
-            window.parent.postMessage({
-                type: "task2_model_chosen",
-                value: selectedModel
-            }, "*");
+      window.parent.postMessage(
+        {
+          type: "task2_model_chosen",
+          value: selectedModel,
+          timestamp: timestamp()
+        },
+        "*"
+      );
 
-            renderPage2();
-        });
+      renderLoading();
     });
+  });
+}
+
+function renderLoading() {
+  app.innerHTML = `
+    <h2>Loading Model</h2>
+    <p>Please wait while the model is being prepared...</p>
+    <div class="loader"></div>
+  `;
+
+  window.parent.postMessage(
+    {
+      type: "task2_model_loading",
+      timestamp: timestamp()
+    },
+    "*"
+  );
+
+  setTimeout(renderPage2, 1200);
 }
 
 function renderPage2() {
-    stage = 2;
-    app.innerHTML = `
-        <h2>Ask the Model</h2>
-        <p><strong>Question:</strong> ${QUESTION_TEXT}</p>
+  stage = 2;
 
-        <div id="chat"></div>
+  app.innerHTML = `
+    <h2>Ask the Model</h2>
+    <p><strong>Question:</strong> ${QUESTION_TEXT}</p>
 
-        <div class="chat-box">
-            <input type="text" id="userInput" placeholder="Type your prompt to the model..." />
-            <button id="sendBtn">Send</button>
-        </div>
-    `;
+    <div id="chat"></div>
 
-    document.getElementById("sendBtn").addEventListener("click", () => {
-        const msg = document.getElementById("userInput").value.trim();
-        if (!msg) return;
+    <div class="chat-box">
+      <input type="text" id="userInput" placeholder="Type your prompt to the model..." />
+      <button id="sendBtn">Send</button>
+    </div>
+  `;
 
-        const chat = document.getElementById("chat");
+  const sendBtn = document.getElementById("sendBtn");
+  const input = document.getElementById("userInput");
 
-        // Show user message
-        chat.innerHTML += `<div class="chat-message chat-user">${msg}</div>`;
+  sendBtn.addEventListener("click", () => {
+    const msg = input.value.trim();
+    if (!msg) return;
 
-        // send prompt to Qualtrics
-        window.parent.postMessage({
-            type: "task2_prompt",
-            value: msg
-        }, "*");
+    sendBtn.disabled = true;
+    input.disabled = true;
 
-        // Show generating
-        chat.innerHTML += `<div class="chat-message chat-model">Generating...</div>`;
+    const chat = document.getElementById("chat");
 
-        // Fake delay
-        setTimeout(() => {
-            const modelAns = fakeResponses[selectedModel];
+    chat.innerHTML += `<div class="chat-message chat-user">${msg}</div>`;
 
-            // Remove generating
-            const msgs = document.querySelectorAll(".chat-message.chat-model");
-            msgs[msgs.length - 1].remove();
+    window.parent.postMessage(
+      {
+        type: "task2_prompt",
+        value: msg,
+        timestamp: timestamp()
+      },
+      "*"
+    );
 
-            // Show final answer
-            chat.innerHTML += `<div class="chat-message chat-model">${modelAns}</div>`;
+    chat.innerHTML += `<div class="chat-message chat-model">Generating...</div>`;
 
-            // notify Qualtrics
-            window.parent.postMessage({
-                type: "task2_fakeAnswer",
-                value: modelAns
-            }, "*");
+    setTimeout(() => {
+      const responses = fakeResponses[selectedModel];
+      generatedAnswer = responses[Math.floor(Math.random() * responses.length)];
 
-            // Add continue button
-            app.innerHTML += `
-                <button id="continueBtn">Continue</button>
-            `;
+      const msgs = document.querySelectorAll(".chat-message.chat-model");
+      msgs[msgs.length - 1].remove();
 
-            document.getElementById("continueBtn").addEventListener("click", renderPage3);
+      chat.innerHTML += `<div class="chat-message chat-model">${generatedAnswer}</div>`;
 
-        }, 1000);
-    });
+      window.parent.postMessage(
+        {
+          type: "task2_fakeAnswer",
+          value: generatedAnswer,
+          timestamp: timestamp()
+        },
+        "*"
+      );
+
+      app.innerHTML += `<button id="continueBtn">Continue</button>`;
+      document.getElementById("continueBtn").addEventListener("click", renderPage3);
+    }, 1000);
+  });
 }
 
 function renderPage3() {
-    stage = 3;
-    app.innerHTML = `
-        <h2>Your Final Answer</h2>
-        <p>Please type your final answer below. Your bonus will be based on accuracy.</p>
+  stage = 3;
 
-        <input type="text" id="finalAnswer" placeholder="Your answer..." />
-        <button id="submitFinal">Submit Answer</button>
-    `;
+  app.innerHTML = `
+    <h2>Your Final Answer</h2>
+    <p>
+      Below is the response provided by the model. Please type your final answer.
+      Your bonus will be based on accuracy.
+    </p>
 
-    document.getElementById("submitFinal").addEventListener("click", () => {
-        const answer = document.getElementById("finalAnswer").value.trim();
-        if (!answer) return;
+    <div class="chat-message chat-model">${generatedAnswer}</div>
 
-        // Send to Qualtrics
-        window.parent.postMessage({
-            type: "task2_finalAnswer",
-            value: answer
-        }, "*");
+    <input type="text" id="finalAnswer" placeholder="Your answer..." />
+    <button id="submitFinal">Submit Answer</button>
+  `;
 
-        // Allow Qualtrics Next button to appear
-        window.parent.postMessage({ type: "task2_done" }, "*");
+  document.getElementById("submitFinal").addEventListener("click", () => {
+    const answer = document.getElementById("finalAnswer").value.trim();
+    if (!answer) return;
 
-        app.innerHTML = `<h2>Thank you! You may now proceed.</h2>`;
-    });
+    window.parent.postMessage(
+      {
+        type: "task2_finalAnswer",
+        value: answer,
+        timestamp: timestamp()
+      },
+      "*"
+    );
+
+    window.parent.postMessage(
+      {
+        type: "task2_done",
+        timestamp: timestamp()
+      },
+      "*"
+    );
+
+    app.innerHTML = `<h2>Thank you! You may now proceed.</h2>`;
+  });
 }
 
-// Start
 renderPage1();
