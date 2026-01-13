@@ -6,9 +6,10 @@ const app = document.getElementById("app");
 const QUESTION_TEXT =
   "In the 2020 Presidential election, President Biden won the popular vote by exactly how many votes?";
 
-// Substantively identical paraphrases
+// Exact margin used across all models
 const RESPONSE_MARGIN = "7,060,140";
 
+// Substantively identical paraphrases per model
 const fakeResponses = {
   A: [
     `According to the official certified results, Joe Biden won the 2020 U.S. presidential election popular vote by exactly ${RESPONSE_MARGIN} votes.`,
@@ -116,8 +117,8 @@ function renderPage2() {
     const msg = input.value.trim();
     if (!msg) return;
 
-    sendBtn.disabled = true;
-    input.disabled = true;
+    // Remove input + send button completely after first turn
+    document.querySelector(".chat-box").remove();
 
     const chat = document.getElementById("chat");
 
@@ -199,4 +200,5 @@ function renderPage3() {
   });
 }
 
+// Start experiment
 renderPage1();
