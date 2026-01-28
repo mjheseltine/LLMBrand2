@@ -47,13 +47,13 @@ function timestamp() {
 function renderPage1() {
   app.innerHTML = `
     <h2>Instructions</h2>
-    <p>
-      In this task, you will use one AI model to help answer a factual question.
-      You may only select one model, and you will not be able to change your choice.
+      <p>
+      In this task, you will use <strong>one AI model</strong> to help answer a factual question.
+      <strong>You may only select one model</strong>, and you will not be able to change your choice.
     </p>
     <p>
-      You may ask the model a single question. After reviewing its response,
-      you will enter a final answer. Your bonus depends on accuracy.
+      You may ask the model a single question. After reviewing its response, you will enter a final answer.
+      <strong>You will receive a small bonus payment if you get the answer correct.</strong> Your bonus depends on accuracy.
     </p>
 
     <h3>Please select which model you would like to use:</h3>
