@@ -1,4 +1,4 @@
-let selectedModel = null;
+let selectedModel = null;   // this stays as A/B/C/D (the slot)
 let stage = 1;
 let generatedAnswer = null;
 
@@ -8,6 +8,26 @@ const QUESTION_TEXT =
   "In the 2020 Presidential election, President Biden won the popular vote by exactly how many votes?";
 
 const RESPONSE_MARGIN = "7,060,140";
+
+/* --------------------------------------------------
+   VISUAL LABELS (TASK 1 CONSISTENCY)
+   - Slots are A/B/C/D (what data + Qualtrics record)
+   - Labels/classes are what participants see
+-------------------------------------------------- */
+
+const SLOT_LABELS = {
+  A: "Purple model",
+  B: "Blue model",
+  C: "Orange model",
+  D: "Green model"
+};
+
+const SLOT_CLASSES = {
+  A: "purple",
+  B: "blue",
+  C: "orange",
+  D: "green"
+};
 
 /* --------------------------------------------------
    FIXED RESPONSE MAP (SLOTS, NOT NAMES)
@@ -47,7 +67,7 @@ function timestamp() {
 function renderPage1() {
   app.innerHTML = `
     <h2>Instructions</h2>
-      <p>
+    <p>
       In this task, you will use <strong>one AI model</strong> to help answer a factual question.
       <strong>You may only select one model</strong>, and you will not be able to change your choice.
     </p>
@@ -58,22 +78,21 @@ function renderPage1() {
 
     <h3>Please select which model you would like to use:</h3>
 
-    <div class="model-choice" data-slot="A">Model A</div>
-    <div class="model-choice" data-slot="B">Model B</div>
-    <div class="model-choice" data-slot="C">Model C</div>
-    <div class="model-choice" data-slot="D">Model D</div>
+    <div class="model-choice ${SLOT_CLASSES.A}" data-slot="A">${SLOT_LABELS.A}</div>
+    <div class="model-choice ${SLOT_CLASSES.B}" data-slot="B">${SLOT_LABELS.B}</div>
+    <div class="model-choice ${SLOT_CLASSES.C}" data-slot="C">${SLOT_LABELS.C}</div>
+    <div class="model-choice ${SLOT_CLASSES.D}" data-slot="D">${SLOT_LABELS.D}</div>
   `;
 
   document.querySelectorAll(".model-choice").forEach(box => {
     box.addEventListener("click", () => {
-      selectedModel = box.dataset.slot;
-
-      console.log("Selected model slot:", selectedModel);
+      selectedModel = box.dataset.slot; // A/B/C/D
 
       window.parent.postMessage(
         {
           type: "task2_model_chosen",
           value: selectedModel,
+          label: SLOT_LABELS[selectedModel],   // optional, helpful for debugging
           timestamp: timestamp()
         },
         "*"
@@ -89,8 +108,10 @@ function renderPage1() {
 -------------------------------------------------- */
 
 function renderLoading() {
+  const label = SLOT_LABELS[selectedModel] || "Model";
+
   app.innerHTML = `
-    <h2>Loading Model</h2>
+    <h2>Loading ${label}</h2>
     <p>Please wait while the model is being prepared...</p>
     <div class="loader"></div>
   `;
@@ -98,6 +119,8 @@ function renderLoading() {
   window.parent.postMessage(
     {
       type: "task2_model_loading",
+      value: selectedModel,
+      label,
       timestamp: timestamp()
     },
     "*"
@@ -133,6 +156,7 @@ function renderPage2() {
     const msg = input.value.trim();
     if (!msg) return;
 
+    // One-turn only: remove input box
     document.querySelector(".chat-box").remove();
 
     chat.innerHTML += `<div class="chat-message chat-user">${msg}</div>`;
@@ -141,6 +165,7 @@ function renderPage2() {
       {
         type: "task2_prompt",
         value: msg,
+        model: selectedModel,
         timestamp: timestamp()
       },
       "*"
@@ -154,25 +179,22 @@ function renderPage2() {
     setTimeout(() => {
       const responses = fakeResponses[selectedModel];
 
-      if (!responses) {
-        console.error("No responses found for model:", selectedModel);
+      if (!responses || responses.length === 0) {
+        console.error("No responses found for model slot:", selectedModel);
         loadingMsg.textContent = "An error occurred.";
         return;
       }
 
-      generatedAnswer =
-        responses[Math.floor(Math.random() * responses.length)];
+      generatedAnswer = responses[Math.floor(Math.random() * responses.length)];
 
       loadingMsg.remove();
-
-      chat.innerHTML += `
-        <div class="chat-message chat-model">${generatedAnswer}</div>
-      `;
+      chat.innerHTML += `<div class="chat-message chat-model">${generatedAnswer}</div>`;
 
       window.parent.postMessage(
         {
           type: "task2_fakeAnswer",
           value: generatedAnswer,
+          model: selectedModel,
           timestamp: timestamp()
         },
         "*"
@@ -202,7 +224,7 @@ function renderPage3() {
       Your bonus will be based on accuracy.
     </p>
 
-    <div class="chat-message chat-model">${generatedAnswer}</div>
+    <div class="chat-message chat-model">${generatedAnswer || ""}</div>
 
     <input type="text" id="finalAnswer" placeholder="Your answer..." />
     <button id="submitFinal">Submit Answer</button>
@@ -216,6 +238,7 @@ function renderPage3() {
       {
         type: "task2_finalAnswer",
         value: answer,
+        model: selectedModel,
         timestamp: timestamp()
       },
       "*"
