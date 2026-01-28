@@ -1,4 +1,4 @@
-let selectedModel = null;   // this stays as A/B/C/D (the slot)
+let selectedModel = null;   // underlying slot A/B/C/D (what we record + what fakeResponses uses)
 let stage = 1;
 let generatedAnswer = null;
 
@@ -10,27 +10,62 @@ const QUESTION_TEXT =
 const RESPONSE_MARGIN = "7,060,140";
 
 /* --------------------------------------------------
-   VISUAL LABELS (TASK 1 CONSISTENCY)
-   - Slots are A/B/C/D (what data + Qualtrics record)
-   - Labels/classes are what participants see
+   TASK 1 → TASK 2 CONSISTENCY
+   - Participants choose a COLOR option (purple/blue/orange/green)
+   - We map that color back to the underlying slot using Task 1 model_order
 -------------------------------------------------- */
 
-const SLOT_LABELS = {
-  A: "Purple model",
-  B: "Blue model",
-  C: "Orange model",
-  D: "Green model"
-};
+// What participants see / click (fixed order)
+const COLOR_OPTIONS = [
+  { label: "Purple model", className: "purple" },
+  { label: "Blue model", className: "blue" },
+  { label: "Orange model", className: "orange" },
+  { label: "Green model", className: "green" }
+];
 
-const SLOT_CLASSES = {
-  A: "purple",
-  B: "blue",
-  C: "orange",
-  D: "green"
-};
+// model_order received from Qualtrics (Task 1), e.g. "D,A,B,C"
+// Meaning: Purple->D, Blue->A, Orange->B, Green->C
+let task1ModelOrder = null; // array like ["D","A","B","C"]
+
+function timestamp() {
+  return Date.now();
+}
+
+function requestModelOrderFromParent() {
+  window.parent.postMessage({ type: "request_model_order" }, "*");
+}
+
+window.addEventListener("message", (event) => {
+  const data = event.data;
+  if (!data || typeof data !== "object") return;
+
+  // Qualtrics should respond with: { type:"model_order_response", value:"D,A,B,C" }
+  if (data.type === "model_order_response") {
+    const raw = (data.value || "").trim();
+    const parsed = raw.split(",").map(s => s.trim()).filter(Boolean);
+
+    // basic validation: must be 4 slots containing A/B/C/D
+    const ok =
+      parsed.length === 4 &&
+      parsed.every(x => ["A", "B", "C", "D"].includes(x));
+
+    if (ok) {
+      task1ModelOrder = parsed;
+      console.log("Task 2 received model_order:", task1ModelOrder.join(","));
+    } else {
+      console.warn("Task 2 got invalid model_order_response:", data.value);
+      task1ModelOrder = null;
+    }
+  }
+});
+
+function slotForColorIndex(i) {
+  if (!task1ModelOrder) return null;
+  return task1ModelOrder[i] || null;
+}
 
 /* --------------------------------------------------
-   FIXED RESPONSE MAP (SLOTS, NOT NAMES)
+   FIXED RESPONSE MAP (KEYED BY UNDERLYING SLOT)
 -------------------------------------------------- */
 
 const fakeResponses = {
@@ -56,15 +91,14 @@ const fakeResponses = {
   ]
 };
 
-function timestamp() {
-  return Date.now();
-}
-
 /* --------------------------------------------------
-   PAGE 1 — INSTRUCTIONS + MODEL CHOICE
+   PAGE 1 — INSTRUCTIONS + COLOR MODEL CHOICE
 -------------------------------------------------- */
 
 function renderPage1() {
+  // request Task 1 mapping immediately (Qualtrics should respond quickly)
+  requestModelOrderFromParent();
+
   app.innerHTML = `
     <h2>Instructions</h2>
     <p>
@@ -78,27 +112,44 @@ function renderPage1() {
 
     <h3>Please select which model you would like to use:</h3>
 
-    <div class="model-choice ${SLOT_CLASSES.A}" data-slot="A">${SLOT_LABELS.A}</div>
-    <div class="model-choice ${SLOT_CLASSES.B}" data-slot="B">${SLOT_LABELS.B}</div>
-    <div class="model-choice ${SLOT_CLASSES.C}" data-slot="C">${SLOT_LABELS.C}</div>
-    <div class="model-choice ${SLOT_CLASSES.D}" data-slot="D">${SLOT_LABELS.D}</div>
+    ${COLOR_OPTIONS.map((opt, i) => `
+      <div class="model-choice ${opt.className}" data-color-index="${i}">
+        ${opt.label}
+      </div>
+    `).join("")}
   `;
 
   document.querySelectorAll(".model-choice").forEach(box => {
     box.addEventListener("click", () => {
-      selectedModel = box.dataset.slot; // A/B/C/D
+      const colorIndex = Number(box.dataset.colorIndex);
+      const chosenLabel = COLOR_OPTIONS[colorIndex]?.label || "Model";
+
+      // Map color -> underlying slot using Task 1 model_order
+      const underlyingSlot = slotForColorIndex(colorIndex);
+
+      // If model_order hasn't arrived yet, force a retry / block
+      if (!underlyingSlot) {
+        console.warn("Model order not ready yet — requesting again.");
+        requestModelOrderFromParent();
+        alert("Loading… please wait a moment and try again.");
+        return;
+      }
+
+      selectedModel = underlyingSlot; // A/B/C/D
+
+      console.log("Selected color:", chosenLabel, "→ underlying slot:", selectedModel);
 
       window.parent.postMessage(
         {
           type: "task2_model_chosen",
-          value: selectedModel,
-          label: SLOT_LABELS[selectedModel],   // optional, helpful for debugging
+          value: selectedModel,         // A/B/C/D (consistent with Task 1)
+          colorLabel: chosenLabel,       // "Purple model" etc. (optional but useful)
           timestamp: timestamp()
         },
         "*"
       );
 
-      renderLoading();
+      renderLoading(chosenLabel);
     });
   });
 }
@@ -107,9 +158,7 @@ function renderPage1() {
    LOADING SCREEN
 -------------------------------------------------- */
 
-function renderLoading() {
-  const label = SLOT_LABELS[selectedModel] || "Model";
-
+function renderLoading(label) {
   app.innerHTML = `
     <h2>Loading ${label}</h2>
     <p>Please wait while the model is being prepared...</p>
@@ -120,7 +169,7 @@ function renderLoading() {
     {
       type: "task2_model_loading",
       value: selectedModel,
-      label,
+      colorLabel: label,
       timestamp: timestamp()
     },
     "*"
@@ -165,7 +214,7 @@ function renderPage2() {
       {
         type: "task2_prompt",
         value: msg,
-        model: selectedModel,
+        model: selectedModel, // A/B/C/D
         timestamp: timestamp()
       },
       "*"
