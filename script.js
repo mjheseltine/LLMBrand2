@@ -11,8 +11,6 @@ const RESPONSE_MARGIN = "7,060,140";
 
 /* --------------------------------------------------
    TASK 1 → TASK 2 CONSISTENCY
-   - Participants choose a COLOR option (purple/blue/orange/green)
-   - We map that color back to the underlying slot using Task 1 model_order
 -------------------------------------------------- */
 
 // What participants see / click (fixed order)
@@ -24,7 +22,6 @@ const COLOR_OPTIONS = [
 ];
 
 // model_order received from Qualtrics (Task 1), e.g. "D,A,B,C"
-// Meaning: Purple->D, Blue->A, Orange->B, Green->C
 let task1ModelOrder = null; // array like ["D","A","B","C"]
 
 function timestamp() {
@@ -106,7 +103,7 @@ function renderPage1() {
       <strong>You may only select one model</strong>, and you will not be able to change your choice.
     </p>
     <p>
-      You may ask the model a single question. After reviewing its response, you will enter a final answer.
+      You may request advice from the model once. After reviewing its response, you will enter a final answer.
       <strong>You will receive a small bonus payment if you get the answer correct.</strong> Your bonus depends on accuracy.
     </p>
 
@@ -143,7 +140,7 @@ function renderPage1() {
         {
           type: "task2_model_chosen",
           value: selectedModel,         // A/B/C/D (consistent with Task 1)
-          colorLabel: chosenLabel,       // "Purple model" etc. (optional but useful)
+          colorLabel: chosenLabel,      // "Purple model" etc. (optional but useful)
           timestamp: timestamp()
         },
         "*"
@@ -179,7 +176,7 @@ function renderLoading(label) {
 }
 
 /* --------------------------------------------------
-   PAGE 2 — ASK MODEL
+   PAGE 2 — ASK MODEL (UPDATED: wide button, highlighted question, no repeated question in chat)
 -------------------------------------------------- */
 
 function renderPage2() {
@@ -187,58 +184,65 @@ function renderPage2() {
 
   app.innerHTML = `
     <h2>Ask the Model</h2>
-    <p><strong>Question:</strong> ${QUESTION_TEXT}</p>
+
+    <div class="question-highlight">
+      <strong>Question:</strong><br><br>
+      ${QUESTION_TEXT}
+    </div>
 
     <div id="chat"></div>
 
     <div class="chat-box">
-      <input type="text" id="userInput" placeholder="Type your prompt to the model..." />
-      <button id="sendBtn">Send</button>
+      <button id="getAdviceBtn" style="width:100%; padding:14px; font-size:16px; border-radius:10px;">
+        Get advice from the model
+      </button>
     </div>
   `;
 
-  const sendBtn = document.getElementById("sendBtn");
-  const input = document.getElementById("userInput");
+  const getAdviceBtn = document.getElementById("getAdviceBtn");
   const chat = document.getElementById("chat");
 
-  sendBtn.addEventListener("click", () => {
-    const msg = input.value.trim();
-    if (!msg) return;
+  getAdviceBtn.addEventListener("click", () => {
+    // disable to prevent double clicks
+    getAdviceBtn.disabled = true;
+    getAdviceBtn.textContent = "Requesting…";
 
-    // One-turn only: remove input box
-    document.querySelector(".chat-box").remove();
-
-    chat.innerHTML += `<div class="chat-message chat-user">${msg}</div>`;
-
+    // Send identical prompt log so Qualtrics sees the same question text as before
     window.parent.postMessage(
       {
         type: "task2_prompt",
-        value: msg,
-        model: selectedModel, // A/B/C/D
+        value: QUESTION_TEXT,
+        model: selectedModel,
         timestamp: timestamp()
       },
       "*"
     );
 
-    const loadingMsg = document.createElement("div");
-    loadingMsg.className = "chat-message chat-model";
-    loadingMsg.textContent = "Generating...";
-    chat.appendChild(loadingMsg);
+    // Remove the button area after the one-turn request
+    const box = document.querySelector(".chat-box");
+    if (box) box.remove();
+
+    // Show generating indicator
+    chat.innerHTML += `<div class="chat-message chat-model">Generating…</div>`;
 
     setTimeout(() => {
       const responses = fakeResponses[selectedModel];
 
       if (!responses || responses.length === 0) {
         console.error("No responses found for model slot:", selectedModel);
-        loadingMsg.textContent = "An error occurred.";
+        const msgs = document.querySelectorAll(".chat-message.chat-model");
+        if (msgs.length) msgs[msgs.length - 1].textContent = "An error occurred.";
         return;
       }
 
       generatedAnswer = responses[Math.floor(Math.random() * responses.length)];
 
-      loadingMsg.remove();
+      // Remove the generating message and show only the model's answer (no user question repeated)
+      const msgs = document.querySelectorAll(".chat-message.chat-model");
+      if (msgs.length) msgs[msgs.length - 1].remove();
       chat.innerHTML += `<div class="chat-message chat-model">${generatedAnswer}</div>`;
 
+      // Send the same fake-answer message for logging
       window.parent.postMessage(
         {
           type: "task2_fakeAnswer",
@@ -249,13 +253,13 @@ function renderPage2() {
         "*"
       );
 
+      // Add continue button (keeps same flow)
       const continueBtn = document.createElement("button");
       continueBtn.id = "continueBtn";
       continueBtn.textContent = "Continue";
       continueBtn.addEventListener("click", renderPage3);
-
       app.appendChild(continueBtn);
-    }, 1000);
+    }, 1100);
   });
 }
 
